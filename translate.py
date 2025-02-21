@@ -1,36 +1,32 @@
+import requests
 import streamlit as st
-import openai
 
-# Set OpenAI API key
-openai.api_key = "sk-TNjP_ORsBVIwYouwdCRofJkpBb3zUJNcFdiwXhks_rT3BlbkFJQliMPzxI8AST_0rJ_6bmcxMxzZlEYifnpoQa0jpQ0A"
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Hugging Face API 설정
+API_TOKEN = "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"
+headers = {"Authorization": f"Bearer {API_TOKEN}"}
+API_URL = "https://api-inference.huggingface.co/models/Helsinki-NLP/opus-mt-ko-en"
 
-with st.chat_message("assistant"):
-    st.write("안녕하세요! 무엇이든 제가 한글로 번역해드릴게요!")
-
-prompt = st.chat_input("번역할 문장")
-
-if prompt:
-    # Check for toxicity
-    moderation_response = openai.Moderation.create(model="text-moderation-latest", input=prompt)
-    flagged = moderation_response["results"][0]["flagged"]
+# 번역 함수
+def translate_text(text):
+    response = requests.post(API_URL, headers=headers, json={"inputs": text})
     
-    # Translate text if not flagged
-    if flagged:
-        st.error("유해한 내용이 포함되어 있습니다.")
+    if response.status_code == 200:
+        result = response.json()
+        if result and "translation_text" in result[0]:
+            return result[0]["translation_text"]
+        else:
+            st.error("번역 결과 형식이 예상과 다릅니다.")
+            return None
     else:
-        translation_response = openai.ChatCompletion.create(
-            model="gpt-4", 
-            messages=[{"role": "user", "content": f"{prompt}\n 번역해줘."}]
-        )
-        translation = translation_response.choices[0].message["content"]
-        st.session_state.messages.append((prompt, translation, "No Toxicity"))
-        st.write(f"번역: {translation}")
+        st.error(f"Translation Error: {response.status_code}")
+        return None
 
-for prompt, translation, status in st.session_state.messages:
-    with st.chat_message("user"):
-        st.write(prompt)
-    with st.chat_message("assistant"):
-        st.write(f"{translation} ({status})")
+# Streamlit UI
+st.title("한국어-영어 번역 챗봇")
+st.write("한국어로 메시지를 입력하면 영어로 번역해 드립니다.")
+
+# 사용자 입력
+user_input = st.text_input("메시지를 입력하세요", "")
+# 번역하기 버튼을 누르면 번역을 진행하고 번역 결과를 출력해줍니다.
+if st.button("번역하기"):
+    st.write(translate_text(user_input))
